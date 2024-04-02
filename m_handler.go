@@ -78,6 +78,7 @@ func withBasicAuth(handler http.HandlerFunc) http.HandlerFunc {
 
 func handlerListMounts(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "sid")
+
 	viewData := &ViewData{
 		CsrfToken:    csrf.Token(r),
 		Flashes:      session.Flashes(),
@@ -115,6 +116,7 @@ func handlerUnmount(w http.ResponseWriter, r *http.Request) {
 	userInputDevice := r.FormValue("device")
 
 	if !regexDevice.MatchString(userInputDevice) {
+		// Validation NOT OK
 		session.AddFlash("[error] invalid device " + userInputDevice)
 		logger.Error("[error] invalid device from user input")
 	} else {
@@ -139,12 +141,12 @@ func handlerKillProcess(w http.ResponseWriter, r *http.Request) {
 	pidStr := r.FormValue("pid")
 	pid, err := strconv.Atoi(pidStr)
 	if err != nil || pid <= 0 {
+		// Validation NOT OK
 		session.AddFlash("[error] Invalid PID: " + pidStr)
 		logger.Error("[error] Invalid PID:", pidStr)
 	} else {
 		// Validation OK
-		cmd := exec.Command("sudo", "kill", "-9", strconv.Itoa(pid))
-		err = cmd.Run()
+		err = killProcess(pid)
 		if err != nil {
 			session.AddFlash("[error] Failed to kill process: " + err.Error())
 			logger.Error("[error] Failed to kill process:", err)

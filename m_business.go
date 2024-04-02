@@ -115,6 +115,28 @@ func unmountDevice(device string) error {
 	return nil
 }
 
+func killProcess(pid int) error {
+	mounts, err := getMounts()
+	if err != nil {
+		return fmt.Errorf("failed to get mounts: %v", err)
+	}
+
+	found := false
+	for _, mount := range mounts {
+		for _, usage := range mount.Usages {
+			if pid == usage.PID {
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		return fmt.Errorf("pid not found: %d", pid)
+	}
+
+	return exec.Command("sudo", "kill", "-9", strconv.Itoa(pid)).Run()
+}
+
 func getMounts() ([]Mount, error) {
 	cmd := exec.Command("mount")
 	output, err := cmd.CombinedOutput()
