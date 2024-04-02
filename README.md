@@ -24,7 +24,7 @@ sudo useradd -r -s /bin/false unmounter
 
 ### 3. add rights to the new user
 ```
-unmounter ALL=(root) NOPASSWD: /bin/umount -- /mnt/external, /bin/systemctl restart autofs, /usr/bin/smbstatus --locked, /usr/bin/lsof -- /mnt/external
+unmounter ALL=(root) NOPASSWD: /usr/bin/kill, /bin/umount -- /mnt/external, /bin/systemctl restart autofs, /usr/bin/smbstatus --locked, /usr/bin/lsof -- /mnt/external
 ```
 
 ### 4. adjust .env file
@@ -35,7 +35,7 @@ vim .env
 
 ### 5. build, deploy and install service
 ```
-./build_and_deploy.sh
+./run_build_and_deploy.sh
 # runs on http://your-ip:8080/ with
 ```
 

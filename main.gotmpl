@@ -1,6 +1,4 @@
-package main
-
-const htmlTemplate = `
+{{define "main"}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,6 +7,20 @@ const htmlTemplate = `
 	<title>Unmounter</title>
 	<link href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.0.6/css/pico.min.css" rel="stylesheet"/>
 	<link href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.colors.min.css" rel="stylesheet"/>
+	<link href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" rel="stylesheet"/>
+	<script>
+		document.addEventListener('DOMContentLoaded', function() {
+			const disableOnClickButtons = document.querySelectorAll('[data-disable-on-click]');
+			disableOnClickButtons.forEach(button => {
+				button.addEventListener('click', function() {
+					event.preventDefault();
+					this.disabled = true;
+					var form = this.closest('form');
+					if (form) {form.submit();}
+				});
+			});
+		});
+	</script>
 	<style>
 		main {
 			max-width: 1024px; 
@@ -64,6 +76,14 @@ const htmlTemplate = `
 			  </svg></a></li>
 			</ul>
 		</nav>
+		{{range .Flashes}}
+			{{with is_error .}}
+				<article class="animate__animated animate__shakeX pico-background-red">{{.}}</article>
+			{{end}}
+			{{with is_success .}}
+				<article class="animate__animated animate__shakeY pico-background-green">{{.}}</article>
+			{{end}}
+    	{{end}}
 		<section>
 			<h2>Services</h2>
 			<details class="outline">
@@ -74,13 +94,21 @@ const htmlTemplate = `
 						<path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
 						<path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0"/>
 						</svg>
-						Autofs
+						AutoFs
 					</div> 
-					{{with .Autofs.Active}}<kbd class="pico-background-green">active</kbd>{{else}}<kbd  class="pico-background-red">inactive !!!</kbd>{{end}}
+					{{with .AutoFs.Active}}<kbd class="pico-background-green">active</kbd>{{else}}<kbd  class="pico-background-red">inactive !!!</kbd>{{end}}
 
 				</summary>
 				<kbd class="multiline overflow-auto">
-					{{.Autofs.Detail}}
+					{{.AutoFs.Detail}}
+					{{with .ErrorAutoFs}}
+						<br><mark class="pico-background-red">{{.}}</mark>
+					{{end}}
+					<br>
+					<form action="/restart-autofs" method="post">
+						<input name="csrf" type="hidden" value="{{$.CsrfToken}}"/>
+						<input type="submit" role="button" class="primary" value="Restart Autofs" data-disable-on-click/>
+					</form>
 				</kbd>
 			</details>
 			<details  class="outline">
@@ -98,6 +126,9 @@ const htmlTemplate = `
 				</summary>
 				<kbd class="multiline overflow-auto">
 					{{.Samba.Detail}}
+					{{with .ErrorSamba}}
+						<br><mark class="pico-background-red">{{.}}</mark>
+					{{end}}
 				</kbd>
 			</details>
 		</section>
@@ -105,12 +136,8 @@ const htmlTemplate = `
 		<section>	
 			<h2>Mounted Devices</h1>
 
-			<form action="/restart-autofs" method="post">
-				<input type="submit" role="button" class="primary" value="Restart Autofs" />
-			</form>
-
-			{{ if .Error }}
-				<mark class="pico-background-red">{{ .Error }}</mark>
+			{{ with .ErrorMounts }}
+				<mark class="pico-background-red">{{.}}</mark>
 			{{ end }}
 
 			{{ if not .Mounts }}
@@ -119,7 +146,8 @@ const htmlTemplate = `
 				{{range $i, $m :=  .Mounts }}
 				<article>
 					<header class="clean">
-						<form  action="/" method="post" style="margin: 0;">
+						<form  action="/unmount" method="post"  class="clean">
+							<input name="csrf" type="hidden" value="{{$.CsrfToken}}"/>
 							<input name="device" type="hidden" value="{{$m.Path}}"/>
 							<fieldset role="group" class="clean">
 								<span  class="usb-icon" title="{{$m.Device}}"><svg xmlns="http://www.w3.org/2000/svg" width="1.8em" fill="currentColor" class="bi bi-usb-drive" viewBox="0 0 16 16">
@@ -129,7 +157,7 @@ const htmlTemplate = `
 								{{with $m.Usages}}
 									<span  data-tooltip="cannot unmount because it is in use"><input type="submit" value="Unmount" disabled/></span>
 								{{else}}
-									<input type="submit" value="Unmount"/>
+									<input type="submit" value="Unmount"  data-disable-on-click />
 								{{end}}
 							</fieldset>
 						</form>
@@ -145,6 +173,7 @@ const htmlTemplate = `
 									<th scope="col">PID</th>
 									<th scope="col">USER</th>
 									<th scope="col">NAME</th>
+									<th></th>
 								</tr>
 							</thead>
 							<tbody>
@@ -154,6 +183,13 @@ const htmlTemplate = `
 										<td>{{.PID}}</td>
 										<td>{{.User}}</td>
 										<td>{{.Name}}</td>
+										<td>
+											<form action="/kill-process" method="post">
+												<input name="csrf" type="hidden" value="{{$.CsrfToken}}"/>
+												<input name="pid" type="hidden" value="{{.PID}}"/>
+												<input type="submit" role="button" class="outline contrast" value="Kill Process" data-disable-on-click>
+											</form>
+										</td>
 									</tr>
 								{{end}}
 							</tbody>
@@ -170,4 +206,4 @@ const htmlTemplate = `
 	</footer>
 </body>
 </html>
-`
+{{end}}

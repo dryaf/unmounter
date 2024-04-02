@@ -2,91 +2,48 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 )
 
-// Define a struct for caching mounts
-type mountCache struct {
-	mounts     []Mount
-	lastUpdate time.Time
-	lock       sync.Mutex
+type ServiceStatus struct {
+	Name   string
+	Active bool
+	Detail string
 }
 
-var cache = mountCache{}
-var ttl = time.Second * 5
+type Usage struct {
+	Command string `json:"command"`
+	PID     int    `json:"pid"`
+	User    string `json:"user"`
+	Name    string `json:"name"`
+}
 
-func getSystemStatus() SystemStatusResponse {
-	var response SystemStatusResponse
+type Mount struct {
+	Device     string  `json:"device"`
+	Path       string  `json:"path"`
+	Usages     []Usage `json:"usages"`
+	UsageError string  `json:"usageError,omitempty"`
+}
 
-	mounts, err := getMounts()
-	if err != nil {
-		response.Error = "Failed to get mounts: " + err.Error()
-	} else {
-		response.Mounts = mounts
-	}
+type SystemStatus struct {
+	Mounts []Mount       `json:"mounts"`
+	AutoFs ServiceStatus `json:"autofs"`
+	Samba  ServiceStatus `json:"samba"`
 
-	autofsStatus, err := checkAutofsStatus()
-	if err != nil {
-		logger.Error("Failed to get Autofs status:", err)
-	} else {
-		response.Autofs = autofsStatus
-	}
+	ErrorMounts error
+	ErrorAutoFs error
+	ErrorSamba  error
+}
 
-	sambaStatus, err := checkSambaStatus()
-	if err != nil {
-		logger.Error("Failed to get Samba status:", err)
-	} else {
-		response.Samba = sambaStatus
-	}
-
+func getSystemStatus() *SystemStatus {
+	response := &SystemStatus{}
+	response.Mounts, response.ErrorMounts = getMounts()
+	response.AutoFs, response.ErrorAutoFs = checkAutofsStatus()
+	response.Samba, response.ErrorSamba = checkSambaStatus()
 	return response
-}
-
-func getMounts() ([]Mount, error) {
-	cache.lock.Lock()
-	defer cache.lock.Unlock()
-
-	if time.Since(cache.lastUpdate) < ttl {
-		return cache.mounts, nil
-	}
-
-	cmd := exec.Command("mount")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return nil, err
-	}
-
-	lines := strings.Split(string(output), "\n")
-	var mounts []Mount
-	for _, line := range lines {
-		parts := strings.Fields(line)
-		if len(parts) > 2 {
-			mountSource := parts[0] // The device or path being mounted
-			mountPoint := parts[2]  // The target path where the device is mounted
-			// Only proceed if mount source starts with `/dev/sd` and mount point starts with `/mnt/` or `/media/`
-			if strings.HasPrefix(mountSource, "/dev/sd") && (strings.HasPrefix(mountPoint, "/mnt/") || strings.HasPrefix(mountPoint, "/media/")) && !strings.Contains(mountPoint, " ") {
-				usages, usageError := getUsages(mountPoint)
-				mount := Mount{
-					Device:     mountSource,
-					Path:       mountPoint,
-					Usages:     usages,
-					UsageError: usageError,
-				}
-				mounts = append(mounts, mount)
-			}
-		}
-	}
-
-	cache.mounts = mounts
-	cache.lastUpdate = time.Now()
-
-	return mounts, nil
 }
 
 func checkAutofsStatus() (ServiceStatus, error) {
@@ -112,15 +69,6 @@ func checkSambaStatus() (ServiceStatus, error) {
 }
 
 func unmountDevice(device string) error {
-	// First, ensure the device path is valid
-	pattern := `^/(mnt|media)/[a-zA-Z0-9_-]+$`
-	matched, err := regexp.MatchString(pattern, device)
-	if err != nil {
-		return fmt.Errorf("regex match error: %v", err)
-	}
-	if !matched {
-		return fmt.Errorf("invalid device path: %s", device)
-	}
 
 	// Check if the device is in the list of currently mounted devices
 	mounts, err := getMounts()
@@ -163,29 +111,38 @@ func unmountDevice(device string) error {
 		// For non-exit errors, just return the error itself
 		return fmt.Errorf("failed to unmount device: %s, error: %v", device, err)
 	}
-	cache = mountCache{}
+
 	return nil
 }
 
-func restartAutofs(w http.ResponseWriter, r *http.Request) {
-	// Make sure this is a POST request
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
+func getMounts() ([]Mount, error) {
+	cmd := exec.Command("mount")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, err
 	}
 
-	// Execute the command to restart autofs
-	cmd := exec.Command("sudo", "systemctl", "restart", "autofs")
-	err := cmd.Run()
-	if err != nil {
-		logger.Error("Failed to restart autofs:", err)
-		http.Error(w, "Failed to restart autofs", http.StatusInternalServerError)
-		return
+	lines := strings.Split(string(output), "\n")
+	var mounts []Mount
+	pattern := regexp.MustCompile(`(\/dev\/[^\s]+)\s+on\s+([^\s]+(?:\s+[^\s]+)*?)\s+type`)
+	for _, line := range lines {
+		matches := pattern.FindStringSubmatch(line)
+		if len(matches) == 3 {
+			mountSource := matches[1]
+			mountPoint := matches[2]
+			if strings.HasPrefix(mountSource, "/dev/sd") && (strings.HasPrefix(mountPoint, "/mnt/") || strings.HasPrefix(mountPoint, "/media/")) {
+				usages, usageError := getUsages(mountPoint)
+				mount := Mount{
+					Device:     mountSource,
+					Path:       mountPoint,
+					Usages:     usages,
+					UsageError: usageError,
+				}
+				mounts = append(mounts, mount)
+			}
+		}
 	}
-	time.Sleep(2 * time.Second)
-	cache = mountCache{}
-	// Redirect to the main page, or just inform of success
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	return mounts, nil
 }
 
 func getUsages(mountPoint string) ([]Usage, string) {
@@ -200,20 +157,26 @@ func getUsages(mountPoint string) ([]Usage, string) {
 
 	var usages []Usage
 	lines := strings.Split(string(output), "\n")
-	for _, line := range lines[1:] { // Skip the header line
-		fields := strings.Fields(line)
-		if len(fields) < 9 {
-			continue // Skip if line doesn't have enough fields.
+	// Skip the header line and any empty lines.
+	for _, line := range lines[1:] {
+		if line == "" {
+			continue
 		}
-		pid, convErr := strconv.Atoi(fields[1])
+		// Regex to match each field, considering that the NAME field can contain spaces.
+		pattern := regexp.MustCompile(`^(\S+)\s+(\d+)\s+(\S+)\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(.*)$`)
+		matches := pattern.FindStringSubmatch(line)
+		if matches == nil || len(matches) != 5 {
+			continue // Skip if the line doesn't match the pattern.
+		}
+		pid, convErr := strconv.Atoi(matches[2])
 		if convErr != nil {
 			continue // Skip if PID conversion fails.
 		}
 		usage := Usage{
-			Command: fields[0],
+			Command: matches[1],
 			PID:     pid,
-			User:    fields[2],
-			Name:    fields[len(fields)-1],
+			User:    matches[3],
+			Name:    matches[4],
 		}
 		usages = append(usages, usage)
 	}

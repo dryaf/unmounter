@@ -2,37 +2,40 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/kardianos/service"
 )
 
-type program struct{}
+var serviceConfig = &service.Config{
+	Name:        "unmounter",
+	DisplayName: "unmounter",
+	Description: "A web service to list and unmount devices.",
+	UserName:    "unmounter",
+	EnvVars: map[string]string{
+		EnvVarAuthUser: username,
+		EnvVarAuthPass: password,
+	},
+}
 
-func (p *program) Start(s service.Service) error {
+type systemService struct{}
+
+func (p *systemService) Start(s service.Service) error {
 	// Start should not block. Do the actual work async.
 	go p.run()
 	return nil
 }
 
-func (p *program) run() {
-	http.HandleFunc("/", basicAuth(listMounts))
-	http.HandleFunc("/restart-autofs", basicAuth(restartAutofs))
-	fmt.Println("Server started at http://localhost:8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		logger.Error(err)
-	}
+func (p *systemService) run() {
+	runWebServer()
 }
 
-func (p *program) Stop(s service.Service) error {
+func (p *systemService) Stop(s service.Service) error {
 	// Any clean-up or resource release logic here.
 	return nil
 }
 
-// Define command-line flags or arguments for service management.
-// For simplicity, this example checks os.Args directly.
-func handleServiceControl(s service.Service) {
+func handleServiceArgs(s service.Service) {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: myservice <command>")
 		fmt.Println("Commands: install, uninstall, start, stop, restart")
