@@ -1,6 +1,6 @@
 module github.com/dryaf/unmounter
 
-go 1.22
+go 1.23
 
 require (
 	github.com/google/safehtml v0.1.1-0.20231004162613-be2313499843

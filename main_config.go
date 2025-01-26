@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"fmt"
 	"log"
 	"os"
 )
@@ -11,7 +12,7 @@ const EnvVarAuthUser = "AUTH_USER"
 const EnvVarAuthPass = "AUTH_PASS"
 
 var username = "admin"
-var password = "sAcure1passw"
+var password = "1b2a"
 
 func init() {
 	var ok bool
@@ -25,6 +26,7 @@ func init() {
 	if ok {
 		password = envPassword
 	}
+	fmt.Println("username: ", username, " password:", password)
 }
 
 func generateRandomKey(length int) []byte {
