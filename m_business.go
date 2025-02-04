@@ -1,4 +1,5 @@
 // ==== File: m_business.go ====
+// ==== File: m_business.go ====
 package main
 
 import (
@@ -8,6 +9,10 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/google/safehtml" // Import safehtml directly
+	"github.com/google/safehtml/uncheckedconversions"
+	// Import safehtml template
 )
 
 type ServiceStatus struct {
@@ -24,12 +29,15 @@ type Usage struct {
 }
 
 type Mount struct {
-	Device              string  `json:"device"`
-	Path                string  `json:"path"`
-	Usages              []Usage `json:"usages"`
-	UsageError          string  `json:"usageError,omitempty"`
-	FreeSpace           string  `json:"freeSpace,omitempty"`
-	FreeSpacePercentage int     `json:"freeSpacePercentage,omitempty"`
+	Device              string         `json:"device"`
+	Path                string         `json:"path"`
+	Usages              []Usage        `json:"usages"`
+	UsageError          string         `json:"usageError,omitempty"`
+	FreeSpace           string         `json:"freeSpace,omitempty"`
+	TotalSpace          string         `json:"totalSpace,omitempty"`          // Added TotalSpace
+	UsedSpacePercentage int            `json:"usedSpacePercentage,omitempty"` // Added UsedSpacePercentage
+	FreeSpacePercentage int            `json:"freeSpacePercentage,omitempty"`
+	StyleWidth          safehtml.Style `json:"-"` // Change StyleWidth to safehtml.Style
 }
 
 type SystemStatus struct {
@@ -155,20 +163,23 @@ func killProcess(pid int) error {
 	return exec.Command("sudo", "kill", "-9", strconv.Itoa(pid)).Run()
 }
 
-func getDiskFreeSpace(path string) (string, int, error) {
+func getDiskFreeSpace(path string) (string, string, int, int, error) { // Modified return values
 	if devModeEnabled {
-		return getDiskFreeSpaceDevMode() // Call dev-mode function
+		freeSpace, percentage, err := getDiskFreeSpaceDevMode()                      // Call dev-mode function
+		return freeSpace, "Simulated Total Space", percentage, 100 - percentage, err // Simulate total space and used percentage
 	}
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(path, &stat)
 	if err != nil {
-		return "", 0, err
+		return "", "", 0, 0, err
 	}
 	// Available blocks * size per block = available space in bytes
 	freeBytes := stat.Bavail * uint64(stat.Bsize)
 	totalBytes := stat.Blocks * uint64(stat.Bsize)
-	percentage := int(float64(freeBytes) / float64(totalBytes) * 100)
-	return formatBytes(freeBytes), percentage, nil
+	freePercentage := int(float64(freeBytes) / float64(totalBytes) * 100)
+	usedPercentage := 100 - freePercentage
+
+	return formatBytes(freeBytes), formatBytes(totalBytes), freePercentage, usedPercentage, nil // Return free space, total space, percentages
 }
 
 // Helper function to format bytes into human-readable format (MB or GB)
@@ -208,20 +219,25 @@ func getMounts() ([]Mount, error) {
 			mountPoint := matches[2]
 			if strings.HasPrefix(mountSource, "/dev/sd") && (strings.HasPrefix(mountPoint, "/mnt/") || strings.HasPrefix(mountPoint, "/media/")) {
 				usages, usageError := getUsages(mountPoint)
-				freeSpace, freeSpacePercentage, err := getDiskFreeSpace(mountPoint)
+				freeSpace, totalSpace, freeSpacePercentage, usedSpacePercentage, err := getDiskFreeSpace(mountPoint) // Get total space and used percentage
 				if err != nil {
 					freeSpace = "Error fetching free space"
 					logger.Error("Error getting free space for", mountPoint, ":", err)
 				}
-				mount := Mount{
+				styleWidth := uncheckedconversions.StyleFromStringKnownToSatisfyTypeContract("width: " + strconv.Itoa(usedSpacePercentage) + "%") // Use StyleFromStringKnownToSatisfyTypeContract
+
+				m := Mount{ // Changed variable name to 'm' to avoid shadowing
 					Device:              mountSource,
 					Path:                mountPoint,
 					Usages:              usages,
 					UsageError:          usageError,
 					FreeSpace:           freeSpace,
+					TotalSpace:          totalSpace,          // Set TotalSpace
+					UsedSpacePercentage: usedSpacePercentage, // Set UsedSpacePercentage
 					FreeSpacePercentage: freeSpacePercentage,
+					StyleWidth:          styleWidth, // Set StyleWidth as safehtml.Style
 				}
-				mounts = append(mounts, mount)
+				mounts = append(mounts, m) // Append the single mount 'm'
 			}
 		}
 	}
@@ -259,13 +275,13 @@ func getUsages(mountPoint string) ([]Usage, string) {
 		if convErr != nil {
 			continue // Skip if PID conversion fails.
 		}
-		usage := Usage{
+		u := Usage{ // Changed variable name to 'u' to avoid shadowing
 			Command: matches[1],
 			PID:     pid,
 			User:    matches[3],
 			Name:    matches[4],
 		}
-		usages = append(usages, usage)
+		usages = append(usages, u) // Append the single usage 'u'
 	}
 
 	return usages, "" // Return usages with no error.

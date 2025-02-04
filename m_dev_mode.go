@@ -1,4 +1,5 @@
 // ==== File: m_dev_mode.go ====
+// ==== File: m_dev_mode.go ====
 package main
 
 import (
@@ -61,7 +62,9 @@ func getMountsDevMode() []Mount {
 			},
 			UsageError:          "",
 			FreeSpace:           "2.5 GB",
-			FreeSpacePercentage: 70,
+			TotalSpace:          "10 GB", // Simulated total space
+			UsedSpacePercentage: 75,      // Simulated used space percentage
+			FreeSpacePercentage: 25,      // Simulated free space percentage
 		},
 		{
 			Device:              "/dev/sdb2",
@@ -69,7 +72,9 @@ func getMountsDevMode() []Mount {
 			Usages:              []Usage{}, // No usages for this one in dev mode sample
 			UsageError:          "",
 			FreeSpace:           "500 MB",
-			FreeSpacePercentage: 25,
+			TotalSpace:          "2 GB", // Simulated total space
+			UsedSpacePercentage: 80,     // Simulated used space percentage
+			FreeSpacePercentage: 20,     // Simulated free space percentage
 		},
 		{
 			Device:              "/dev/sdc1",
@@ -77,7 +82,9 @@ func getMountsDevMode() []Mount {
 			Usages:              []Usage{},
 			UsageError:          "",
 			FreeSpace:           "10 GB",
-			FreeSpacePercentage: 90,
+			TotalSpace:          "100 GB", // Simulated total space
+			UsedSpacePercentage: 90,       // Simulated used space percentage
+			FreeSpacePercentage: 10,       // Simulated free space percentage
 		},
 	}
 	return mounts

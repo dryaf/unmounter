@@ -1,4 +1,5 @@
 // ==== File: main.html ====
+// ==== File: main.html ====
 {{define "main"}}
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="dark">
@@ -97,7 +98,7 @@
 			padding-bottom: 0.5rem;
 		}
 		.accordion-button::after {
-			background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23fff'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
+			background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23fff'%3e%3cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5.5 0 0 1 0-.708z'/%3e%3c/svg%3e");
 		}
 		.accordion-button:not(.collapsed)::after {
 			background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23fff'%3e%3cpath fill-rule='evenodd' d='M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z'/%3e%3c/svg%3e");
@@ -131,6 +132,10 @@
 			font-size: 0.9em;
 			color: #aaa; /* Muted color for disk usage */
 			margin-top: 0.5em;
+			margin-bottom: 0.2em;
+		}
+		.progress {
+			margin-bottom: 0.5em;
 		}
   	</style>
 	</head>
@@ -227,7 +232,10 @@
 						</form>
 					</div>
 					<div class="card-body">
-						<p class="disk-usage">Free Space: {{ $m.FreeSpace }} ({{ $m.FreeSpacePercentage }}% free)</p>
+						<p class="disk-usage">Free Space: {{ $m.FreeSpace }} / Total Space: {{ $m.TotalSpace }} ({{ $m.FreeSpacePercentage }}% free)</p>
+						<div class="progress">
+							<div class="progress-bar" role="progressbar" style="{{ $m.StyleWidth }}" aria-valuenow="{{ $m.UsedSpacePercentage }}" aria-valuemin="0" aria-valuemax="100">Used Space {{ $m.UsedSpacePercentage }}%</div>
+						</div>
 						{{with $m.UsageError}}
 							<div class="alert alert-danger" role="alert">Error fetching usages: {{.}}</div>
 						{{end}}
