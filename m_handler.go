@@ -34,9 +34,9 @@ var flashFuncs = template.FuncMap{
 	},
 }
 
-//go:embed main.gotmpl
+//go:embed main.html
 var templateFS embed.FS
-var mainTemplate = template.Must(template.New("main").Funcs(flashFuncs).ParseFS(template.TrustedFSFromEmbed(templateFS), "main.gotmpl"))
+var mainTemplate = template.Must(template.New("main").Funcs(flashFuncs).ParseFS(template.TrustedFSFromEmbed(templateFS), "main.html"))
 
 type ViewData struct {
 	CsrfToken string

@@ -1,3 +1,4 @@
+// ==== File: m_business.go ====
 package main
 
 import (
@@ -6,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 type ServiceStatus struct {
@@ -22,10 +24,12 @@ type Usage struct {
 }
 
 type Mount struct {
-	Device     string  `json:"device"`
-	Path       string  `json:"path"`
-	Usages     []Usage `json:"usages"`
-	UsageError string  `json:"usageError,omitempty"`
+	Device              string  `json:"device"`
+	Path                string  `json:"path"`
+	Usages              []Usage `json:"usages"`
+	UsageError          string  `json:"usageError,omitempty"`
+	FreeSpace           string  `json:"freeSpace,omitempty"`
+	FreeSpacePercentage int     `json:"freeSpacePercentage,omitempty"`
 }
 
 type SystemStatus struct {
@@ -137,6 +141,35 @@ func killProcess(pid int) error {
 	return exec.Command("sudo", "kill", "-9", strconv.Itoa(pid)).Run()
 }
 
+func getDiskFreeSpace(path string) (string, int, error) {
+	var stat syscall.Statfs_t
+	err := syscall.Statfs(path, &stat)
+	if err != nil {
+		return "", 0, err
+	}
+	// Available blocks * size per block = available space in bytes
+	freeBytes := stat.Bavail * uint64(stat.Bsize)
+	totalBytes := stat.Blocks * uint64(stat.Bsize)
+	percentage := int(float64(freeBytes) / float64(totalBytes) * 100)
+	return formatBytes(freeBytes), percentage, nil
+}
+
+// Helper function to format bytes into human-readable format (MB or GB)
+func formatBytes(bytes uint64) string {
+	const (
+		MB = 1 << 20
+		GB = 1 << 30
+	)
+	switch {
+	case bytes >= GB:
+		return fmt.Sprintf("%.2f GB", float64(bytes)/float64(GB))
+	case bytes >= MB:
+		return fmt.Sprintf("%.2f MB", float64(bytes)/float64(MB))
+	default:
+		return fmt.Sprintf("%d bytes", bytes)
+	}
+}
+
 func getMounts() ([]Mount, error) {
 	cmd := exec.Command("mount")
 	output, err := cmd.CombinedOutput()
@@ -154,11 +187,18 @@ func getMounts() ([]Mount, error) {
 			mountPoint := matches[2]
 			if strings.HasPrefix(mountSource, "/dev/sd") && (strings.HasPrefix(mountPoint, "/mnt/") || strings.HasPrefix(mountPoint, "/media/")) {
 				usages, usageError := getUsages(mountPoint)
+				freeSpace, freeSpacePercentage, err := getDiskFreeSpace(mountPoint)
+				if err != nil {
+					freeSpace = "Error fetching free space"
+					logger.Error("Error getting free space for", mountPoint, ":", err)
+				}
 				mount := Mount{
-					Device:     mountSource,
-					Path:       mountPoint,
-					Usages:     usages,
-					UsageError: usageError,
+					Device:              mountSource,
+					Path:                mountPoint,
+					Usages:              usages,
+					UsageError:          usageError,
+					FreeSpace:           freeSpace,
+					FreeSpacePercentage: freeSpacePercentage,
 				}
 				mounts = append(mounts, mount)
 			}
