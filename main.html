@@ -27,7 +27,7 @@
 			padding-top: 20px;
 		}
 		main {
-			max-width: 1024px; 
+			max-width: 1024px;
 			margin: auto;
 		}
 		.bi {
@@ -50,16 +50,16 @@
 		}
 		.service {
 			font-size: 1.2em;
-			display: flex; 
+			display: flex;
 			align-items: center;
 			width: 200px;
-			margin-right: 10px; 
+			margin-right: 10px;
 			margin-top: 0.6em;
 		}
 		.usb-icon {
-			display: inline-block; 
-			vertical-align: middle; 
-			margin-right: 10px; 
+			display: inline-block;
+			vertical-align: middle;
+			margin-right: 10px;
 			margin-top: 0.6em;
 		}
 		.clean {
@@ -127,13 +127,20 @@
 		section {
 			margin-bottom: 3rem;
 		}
+		.disk-usage {
+			font-size: 0.9em;
+			color: #aaa; /* Muted color for disk usage */
+			margin-top: 0.5em;
+		}
   	</style>
 	</head>
 	<body>
 	<main class="container">
 		<nav class="navbar navbar-expand-lg navbar-dark bg-dark rounded-3 mb-3">
 			<div class="container-fluid">
-				<a class="navbar-brand" href="#"><i class="bi bi-tools fs-4"></i> Unmounter</a>
+				<a class="navbar-brand" href="#">
+					<i class="bi bi-tools fs-4"></i> Unmounter {{if .DevModeEnabled}}<span class="badge bg-warning text-dark ms-2">Dev Mode</span>{{end}}
+				</a>
 				<div class="d-flex">
 					<button onclick="this.disabled=true; setTimeout(function(){ location.reload(); }, 500);" class="btn btn-primary me-2">Refresh</button>
 					<a class="btn btn-outline-light" href="https://github.com/dryaf/unmounter"><i class="bi bi-github fs-4"></i></a>
@@ -194,7 +201,7 @@
 			</div>
 		</section>
 		<hr class="my-4"/>
-		<section>	
+		<section>
 			<h2 class="section-title">Mounted Devices</h2>
 
 			{{ with .ErrorMounts }}
@@ -220,6 +227,7 @@
 						</form>
 					</div>
 					<div class="card-body">
+						<p class="disk-usage">Free Space: {{ $m.FreeSpace }} ({{ $m.FreeSpacePercentage }}% free)</p>
 						{{with $m.UsageError}}
 							<div class="alert alert-danger" role="alert">Error fetching usages: {{.}}</div>
 						{{end}}

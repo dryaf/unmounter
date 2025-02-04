@@ -1,3 +1,4 @@
+// ==== File: m_handler.go ====
 package main
 
 import (
@@ -42,6 +43,7 @@ type ViewData struct {
 	CsrfToken string
 	Flashes   []any
 	*SystemStatus
+	DevModeEnabled bool // Added DevModeEnabled field
 }
 
 func runWebServer() {
@@ -80,9 +82,10 @@ func handlerListMounts(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "sid")
 
 	viewData := &ViewData{
-		CsrfToken:    csrf.Token(r),
-		Flashes:      session.Flashes(),
-		SystemStatus: getSystemStatus(),
+		CsrfToken:      csrf.Token(r),
+		Flashes:        session.Flashes(),
+		SystemStatus:   getSystemStatus(),
+		DevModeEnabled: devModeEnabled, // Pass devModeEnabled to ViewData
 	}
 
 	session.Save(r, w)
@@ -94,15 +97,21 @@ func handlerListMounts(w http.ResponseWriter, r *http.Request) {
 
 func handlerRestartAutoFs(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "sid")
-	cmd := exec.Command("sudo", "systemctl", "restart", "autofs")
-	err := cmd.Run()
-	if err != nil {
-		session.AddFlash("[error] Failed to restart autofs: " + err.Error())
-		logger.Error("[error] Failed to restart autofs:", err)
+	if !devModeEnabled {
+		cmd := exec.Command("sudo", "systemctl", "restart", "autofs")
+		err := cmd.Run()
+		if err != nil {
+			session.AddFlash("[error] Failed to restart autofs: " + err.Error())
+			logger.Error("[error] Failed to restart autofs:", err)
+		} else {
+			time.Sleep(2 * time.Second)
+			session.AddFlash("[success] restarted autofs")
+			logger.Info("[success] restarted autofs")
+		}
 	} else {
-		time.Sleep(2 * time.Second)
-		session.AddFlash("[success] restarted autofs")
-		logger.Info("[success] restarted autofs")
+		time.Sleep(1 * time.Second) // Simulate delay
+		session.AddFlash("[success] restarted autofs (simulated)")
+		logger.Info("[success] restarted autofs (simulated)")
 	}
 	session.Save(r, w)
 	http.Redirect(w, r, "/", http.StatusSeeOther)

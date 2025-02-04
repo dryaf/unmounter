@@ -1,8 +1,10 @@
+// ==== File: m_service.go ====
 package main
 
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/kardianos/service"
 )
@@ -15,6 +17,7 @@ var serviceConfig = &service.Config{
 	EnvVars: map[string]string{
 		EnvVarAuthUser: username,
 		EnvVarAuthPass: password,
+		EnvVarDevMode:  strconv.FormatBool(devModeEnabled),
 	},
 }
 
