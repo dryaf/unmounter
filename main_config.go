@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rand"
-	"fmt"
 	"log"
 	"os"
 )
@@ -26,7 +25,6 @@ func init() {
 	if ok {
 		password = envPassword
 	}
-	fmt.Println("username: ", username, " password:", password)
 }
 
 func generateRandomKey(length int) []byte {
